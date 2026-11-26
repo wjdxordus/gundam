@@ -1,0 +1,13 @@
+{
+  "name": "gundam-uc-archive",
+  "version": "1.0.0",
+  "private": true,
+  "description": "건담 우주세기 상세 연표와 기체 도감",
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node --test",
+    "check": "node --check server.mjs && node --check dist/app.js && node --check dist/archive-data.js && node --check dist/archive.js"
+  }
+}
