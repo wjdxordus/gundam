@@ -38,6 +38,7 @@ function selectEra(year, updateURL = true) {
  $('#year-nav').innerHTML = eras.map(e => `<button class="year-button" data-year="${e.year}" aria-label="U.C. ${pad(e.year)} ${e.label}" aria-pressed="${e.year === era.year}"><strong>${pad(e.year)}</strong><span class="dot"></span><small>${e.label}</small></button>`).join('');
  $('#era-panel').innerHTML = `<div class="era-year"><span class="mini">UNIVERSAL CENTURY</span><div class="year-number"><span>U.C.</span>${pad(era.year)}</div><p>${era.en}</p></div><div class="era-info"><span class="era-badge">HISTORICAL RECORD</span><h3>${era.title}</h3><p>${era.desc}</p><div class="factions">${era.factions.map(f=>`<span>${f}</span>`).join('')}</div></div><div class="era-related"><p>이 시대의 주요 작품</p>${era.related.map(id=>{const w=works.find(w=>w.id===id);return `<button class="related-button" data-work="${id}"><span>${w.type}</span><span><strong>${w.title}</strong><small>${w.year} · ${w.en}</small></span></button>`}).join('')}</div>`;
  $('#era-panel').classList.remove('panel-enter'); void $('#era-panel').offsetWidth; $('#era-panel').classList.add('panel-enter');
+ if(typeof renderEraDetails === 'function') renderEraDetails();
  if(updateURL){const url=new URL(location.href);url.searchParams.set('era',pad(era.year));history.replaceState(null,'',url);}
 }
 $('#year-nav').addEventListener('click',e=>{const b=e.target.closest('[data-year]');if(b){const y=Number(b.dataset.year);selectEra(y);const active=$(`[data-year="${y}"]`);active.focus({preventScroll:true});active.scrollIntoView({behavior:motion?'smooth':'instant',block:'nearest',inline:'nearest'});}});
@@ -52,12 +53,22 @@ $('.filter-tabs').addEventListener('click',e=>{const b=e.target.closest('[data-f
 $('#search').addEventListener('input',e=>{state.query=e.target.value;renderWorks();});
 $('#sort').addEventListener('change',e=>{state.sort=e.target.value;renderWorks();});
 const dialog=$('#detail-dialog');
-function showDialog(content){$('#dialog-content').innerHTML=content;dialog.setAttribute('aria-labelledby','dialog-title');if(!dialog.open)dialog.showModal();document.body.style.overflow='hidden';}
-function showWork(id){const w=works.find(w=>w.id===id);if(!w)return;showDialog(`<p class="eyebrow">${w.en}</p><div class="dialog-year">U.C. ${w.ucLabel||pad(w.uc)}</div><h2 id="dialog-title">${w.title}</h2><div class="factions"><span>${w.type==='ONA'?'ONA · 웹 애니메이션':w.type}</span><span>${w.year}년 첫 공개</span></div><p>${w.desc}</p><div class="dialog-meta"><div><span>주요 인물</span>${w.pilot}</div><div><span>주요 모빌슈트</span>${w.ms}</div></div><p class="art-note">작품 카드에는 공통 건담 팬 아트를 사용했습니다. 작품별 공식 포스터가 아닙니다.</p><button class="outline-button" data-jump="${w.uc}">이 시대의 연표 보기</button>`);}
+const dialogHistory=[];
+function showDialog(content){
+ if(dialog.open) dialogHistory.push({html:$('#dialog-content').innerHTML,scroll:dialog.scrollTop});
+ $('#dialog-content').innerHTML=(dialogHistory.length?'<button class="dialog-back" data-dialog-back>이전 화면</button>':'')+content;
+ dialog.setAttribute('aria-labelledby','dialog-title');if(!dialog.open)dialog.showModal();
+ dialog.scrollTop=0;document.body.style.overflow='hidden';$('.close-dialog').focus({preventScroll:true});
+}
+function showWork(id){
+ const w=works.find(w=>w.id===id);if(!w)return;
+ const notes=workDetails[id]||[];const units=mobileSuits.filter(m=>m.works.includes(id));
+ showDialog(`<p class="eyebrow">${w.en}</p><div class="dialog-year">U.C. ${w.ucLabel||pad(w.uc)}</div><h2 id="dialog-title">${w.title}</h2><div class="factions"><span>${w.type==='ONA'?'ONA · 웹 애니메이션':w.type}</span><span>${w.year}년 첫 공개</span></div><p>${w.desc}</p><div class="dialog-meta"><div><span>주요 인물</span>${w.pilot}</div><div><span>시대</span>${eras.find(e=>e.year===w.uc).title}</div></div><h3 class="reading-title">이 작품을 읽는 관점</h3>${notes.map(n=>`<p>${n}</p>`).join('')}<h3 class="reading-title">주요 등장 기체 <span>${units.length}</span></h3><div class="unit-links">${units.map(m=>unitLink(m)).join('')}</div><p class="scope-note">주요 기체 선별 목록입니다. 기체를 선택하면 상세 정보가 열립니다.</p>${sourceLink(id)}<button class="outline-button" data-jump="${w.uc}">이 시대의 상세 연표 보기</button>`);
+}
 function showGuide(){showDialog(`<p class="eyebrow">A BEGINNER’S FIELD GUIDE</p><h2 id="dialog-title">나의 첫 우주세기.</h2><p>우주세기는 하나의 연대기이지만, 모든 작품을 순서대로 볼 필요는 없어요. 아래는 이 아카이브가 제안하는 세 가지 출발점입니다.</p><div class="guide-route"><h3>세계관의 뿌리부터 알고 싶다면</h3><p>기동전사 건담 → Z 건담 → ZZ 건담 → 역습의 샤아<br>공개 순서대로 인물과 시대의 변화를 따라가는 기본 코스입니다.</p><button data-work="first">기동전사 건담 살펴보기</button></div><div class="guide-route"><h3>짧고 밀도 있는 이야기부터</h3><p>0080 주머니 속의 전쟁<br>6부작으로 한 소년의 눈에 비친 전쟁을 만날 수 있습니다. 일년전쟁의 큰 구도만 알고 시작해도 좋습니다.</p><button data-work="pocket">0080 살펴보기</button></div><div class="guide-route"><h3>현대적인 영상미가 궁금하다면</h3><p>건담 UC(유니콘)<br>우주세기의 분위기를 생생하게 느낄 수 있는 작품입니다. 처음에는 낯선 세력과 용어가 많을 수 있어 연표와 함께 보기를 권합니다.</p><button data-work="unicorn">건담 UC 살펴보기</button></div><p>작품 공개 연도와 이야기 속 U.C. 연도는 다릅니다. 썬더볼트처럼 설정에 독자적인 해석이 있는 외전도 있습니다. 이 페이지는 주요 애니메이션을 추린 입문용 연표입니다.</p>`);}
 $('#guide-open').addEventListener('click',showGuide);$('#guide-banner-open').addEventListener('click',showGuide);
 $('.close-dialog').addEventListener('click',()=>dialog.close());
-dialog.addEventListener('close',()=>{document.body.style.overflow='';});
+dialog.addEventListener('close',()=>{document.body.style.overflow='';dialogHistory.length=0;});
 dialog.addEventListener('click',e=>{if(e.target===dialog){const r=dialog.getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)dialog.close();}});
 document.addEventListener('click',e=>{const work=e.target.closest('[data-work]');if(work)showWork(work.dataset.work);const jump=e.target.closest('[data-jump]');if(jump){dialog.close();selectEra(Number(jump.dataset.jump));$('#timeline').scrollIntoView({behavior:motion?'smooth':'instant'});$(`[data-year="${state.era}"]`).focus({preventScroll:true});}if(e.target.closest('#reset-search')){state.query='';state.filter='all';$('#search').value='';document.querySelectorAll('[data-filter]').forEach(b=>{b.classList.toggle('selected',b.dataset.filter==='all');b.setAttribute('aria-pressed',b.dataset.filter==='all')});renderWorks();}});
 document.addEventListener('keydown',e=>{if(e.key==='/'&&!['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)&&!dialog.open){e.preventDefault();$('#search').focus();}});
@@ -70,6 +81,6 @@ function setMotion(value){motion=value;document.documentElement.classList.toggle
 $('#effects').addEventListener('click',()=>setMotion(!motion));mediaQuery.addEventListener('change',e=>{if(e.matches)setMotion(false);});
 $('.hero').addEventListener('pointermove',e=>{if(!motion||e.pointerType==='touch'||innerWidth<760)return;const r=$('.hero').getBoundingClientRect();const x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;$('.mecha').style.transform=`rotate(-6deg) rotateY(${x*9}deg) translate(${x*9}px,${y*6}px)`;});$('.hero').addEventListener('pointerleave',()=>{$('.mecha').style.transform='';});
 new ResizeObserver(resize).observe(canvas);new IntersectionObserver(entries=>{visible=entries[0].isIntersecting;syncAnimation();}).observe($('.hero'));document.addEventListener('visibilitychange',syncAnimation);
-new IntersectionObserver(entries=>{for(const entry of entries){if(entry.isIntersecting){document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.hash==='#'+entry.target.id));}}},{rootMargin:'-15% 0px -60% 0px'}).observe($('#works'));
-window.addEventListener('scroll',()=>{if($('#works').getBoundingClientRect().top>innerHeight*.4){document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.hash==='#timeline'));}},{passive:true});
+const navSections=['timeline','suits','works','glossary'];
+window.addEventListener('scroll',()=>{const current=navSections.filter(id=>$('#'+id).getBoundingClientRect().top<innerHeight*.4).at(-1)||'timeline';document.querySelectorAll('nav a').forEach(a=>a.classList.toggle('active',a.hash==='#'+current));},{passive:true});
 selectEra(Number(new URL(location.href).searchParams.get('era'))||79,false);renderWorks();resize();setMotion(motion);
